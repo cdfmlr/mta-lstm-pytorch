@@ -1,0 +1,7 @@
+*.model
+*.pt
+*.npy
+*.out
+.ipynb_checkpoints
+data/*.txt
+model_result_multi_layer/

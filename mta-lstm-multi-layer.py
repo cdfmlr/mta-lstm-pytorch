@@ -4,21 +4,24 @@
 # script args
 args = {
     'corpus_file': 'zhihu_small.txt',
-    'target_epoch': 20,
+    'target_epoch': 50,
     'checkpoint_version_name': 'small',
-    'checkpoint_epoch': 0,
+    'checkpoint_epoch': 45,
     'checkpoint_type': 'trainable',
     'plt': False,
+    'corpus_test_split': 0.985,
 }
 
 
 def log_title(s: str):
     p = '=' * 6
-    print(, p, s, p)
+    print(p, s, p, flush=True)
     
-    
-log_title('config args')
-print(args)
+
+print('\n\n\n', flush=True)
+log_title('#' * 6 + ' RUN mta-lstm-multi-layer.py ' + '#' * 6)
+print('\n\n', flush=True)
+print(args, flush=True)
 
 
 # # MTA-LSTM-PyTorch
@@ -100,12 +103,12 @@ log_title('use cuda or cpu as device')
 
 
 os.environ["CUDA_VISIBLE_DEVICES"]="0,1"
-print('Available cuda:', torch.cuda.device_count())
+print('Available cuda:', torch.cuda.device_count(), flush=True)
 if torch.cuda.is_available():
     device_num = 1
     deviceName = "cuda:%d" % device_num
     torch.cuda.set_device(device_num)
-    print('Current device:', torch.cuda.current_device())
+    print('Current device:', torch.cuda.current_device(), flush=True)
 else:
     deviceName = "cpu"
     
@@ -150,7 +153,7 @@ else:
     torch.save(vocab, vocab_check_point)
     torch.save(word_vec, word_vec_check_point)
     
-print("total %d words" % len(word_vec))
+print("total %d words" % len(word_vec), flush=True)
 
 
 # ## Build a word-index convertor
@@ -190,7 +193,7 @@ with open(file_path+file_name) as f:
 #     f.close()
     
 assert len(topics) == len(essays)
-print('topics len:', len(topics))
+print('topics len:', len(topics), flush=True)
 
 
 # We then map all the training and testing corpus to integer index word-by-word, with the help of our convertor. Note that we map it to ```<UNK>``` if the words in corpus are not in the dictionary.
@@ -198,7 +201,7 @@ print('topics len:', len(topics))
 # In[8]:
 
 
-split_index = int(len(topics) * 0.985)
+split_index = int(len(topics) * args['corpus_test_split'])
 
 corpus_indice = list(map(lambda x: [word_to_idx[w] if (w in word_to_idx) else word_to_idx['<UNK>'] for w in x], tqdm(essays[:split_index])))
 topics_indice = list(map(lambda x: [word_to_idx[w] if (w in word_to_idx) else word_to_idx['<UNK>'] for w in x], tqdm(topics[:split_index])))
@@ -212,7 +215,7 @@ topics_test = list(map(lambda x: [word_to_idx[w] if (w in word_to_idx) else word
 def viewData(topics, X):
     topics = [idx_to_word[x] for x in topics]
     X = [idx_to_word[x] for x in X]
-    print(topics, X)
+    print(topics, X, flush=True)
 
 
 # In[10]:
@@ -240,7 +243,7 @@ def shuffleData(topics_indice, corpus_indice):
 
 for t in topics_indice:
     if len(t) != 5:
-        print('less than 5')
+        print('less than 5', flush=True)
 
 
 # We need to know the max length of training corpus too, in order to pad sequences that aren't long enough.
@@ -490,14 +493,14 @@ class MTALSTM(nn.Module):
 def pad_topic(topics):
     topics = [word_to_idx[x] for x in topics]
     topics = torch.tensor(topics)
-    print(topics)
+    print(topics, flush=True)
     max_num = 5
     size = 1
     ans = np.zeros((size, max_num), dtype=int)
     for i in range(size):
         true_len = min(len(topics), max_num)
         for j in range(true_len):
-            print(topics[i])
+            print(topics[i], flush=True)
             ans[i][j] = topics[i][j]
     return ans
 
@@ -672,8 +675,8 @@ def evaluateAndShowAttention(input_sentence, method='beam_search', is_sample=Fal
         _, output_words, attentions, coverage_vector = beam_search(input_sentence, 100, model, idx_to_word, word_to_idx, is_sample=is_sample)
     else:
         _, output_words, attentions, _ = predict_rnn(input_sentence, 100, model, idx_to_word, word_to_idx)
-    print('input =', ' '.join(input_sentence))
-    print('output =', ' '.join(output_words))
+    print('input =', ' '.join(input_sentence), flush=True)
+    print('output =', ' '.join(output_words), flush=True)
 #     n_digits = 3
 #     coverage_vector = torch.round(coverage_vector * 10**n_digits) / (10**n_digits)
 #     coverage_vector=np.round(coverage_vector, n_digits)
@@ -681,7 +684,7 @@ def evaluateAndShowAttention(input_sentence, method='beam_search', is_sample=Fal
     if args['plt']:
         showAttention(' '.join(input_sentence), output_words, attentions)
     else:
-        print('---')
+        print('---', flush=True)
 
 
 # ## Bleu score calculation
@@ -1030,7 +1033,7 @@ if use_gpu:
 #     model = nn.DataParallel(model)
 #     model = model.to(device)
     model = model.to(device)
-    print(f"Dump to {device}")
+    print(f"Dump to {device}", flush=True)
 
 
 # In[29]:
@@ -1077,7 +1080,7 @@ epoch_values = []
 bleu_values = []
 
 if os.path.isfile(model_check_point):
-    print(f'Loading previous status (ver.{version_name}_{version_epoch_num})...')
+    print(f'Loading previous status (ver.{version_name}_{version_epoch_num})...', flush=True)
     model.load_state_dict(torch.load(model_check_point, map_location='cpu'))
     model = model.to(device)
     optimizer.load_state_dict(torch.load(optim_check_point))
@@ -1085,9 +1088,9 @@ if os.path.isfile(model_check_point):
     loss_values = torch.load(loss_check_point)
     epoch_values = torch.load(epoch_check_point)
     bleu_values = torch.load(bleu_check_point)
-    print('Load successfully')
+    print('Load successfully', flush=True)
 else:
-    print(f"ver.{version_name}_{version_epoch_num} doesn't exist")
+    print(f"ver.{version_name}_{version_epoch_num} doesn't exist", flush=True)
 
 
 # In[31]:
@@ -1102,12 +1105,12 @@ evaluateAndShowAttention(['现在', '未来', '梦想', '科学', '文化'], met
 def isnan(x):
     return x != x
 
-for name, p in model.named_parameters():
-#     if p.grad is None:
-#         continue
-    if p.requires_grad:
-        print(name, p)
-#         p.register_hook(lambda grad: torch.clamp(grad, -clip_value, clip_value))
+# for name, p in model.named_parameters():
+# #     if p.grad is None:
+# #         continue
+#     if p.requires_grad:
+#         print(name, p, flush=True)
+# #         p.register_hook(lambda grad: torch.clamp(grad, -clip_value, clip_value))
 
 
 # In[33]:
@@ -1151,7 +1154,7 @@ def save_check_point(model, optimizer, loss_values, epoch_values, bleu_values, s
 for epoch in range(num_epoch - prev_epoch):
     epoch += prev_epoch
     start = time.time()
-    print(f'-- {time.ctime(start)} start training epoch {epoch+1} --')
+    print(f'-- {time.ctime(start)} start training epoch {epoch+1} --', flush=True)
     num, total_loss = 0, 0
 #     optimizer = decay_lr(optimizer=optimizer, epoch=epoch+1)
     topics_indice, corpus_indice = shuffleData(topics_indice, corpus_indice) # shuffle data at every epoch
@@ -1201,7 +1204,7 @@ for epoch in range(num_epoch - prev_epoch):
             for name, p in model.named_parameters():
                 if p.grad is None:
                     continue 
-                print(name, p)
+                print(name, p, flush=True)
             assert False, "Gradient explode"
     
     one_iter_loss = np.mean(total_loss)
@@ -1235,7 +1238,7 @@ for epoch in range(num_epoch - prev_epoch):
     # save current best result
     if bleu_score > best_bleu:
         best_bleu = bleu_score
-        print('current best bleu: %.4f' % best_bleu)
+        print('current best bleu: %.4f' % best_bleu, flush=True)
         
         # model_check_point = '%s/model_best_%d.pk' % (save_folder, epoch+1)
         # optim_check_point = '%s/optim_best_%d.pkl' % (save_folder, epoch+1)
@@ -1259,7 +1262,7 @@ for epoch in range(num_epoch - prev_epoch):
     s -= (m * 60 + h * 3600)
 
     print('epoch %d/%d, loss %.4f, norm %.4f, predict bleu: %.4f, time %.3fs, since %dh %dm %ds'
-      % (epoch + 1, num_epoch, total_loss / num, norm, bleu_score, end - start, h, m, s))
+      % (epoch + 1, num_epoch, total_loss / num, norm, bleu_score, end - start, h, m, s), flush=True)
 
     # verbose
     if ((epoch + 1) % verbose == 0) or (epoch == (num_epoch - 1)):

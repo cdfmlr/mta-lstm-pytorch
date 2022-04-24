@@ -1,15 +1,27 @@
 #!/usr/bin/env python
 # coding: utf-8
 
+import argparse
+
+parser = argparse.ArgumentParser(description='MTA-LSTM')
+parser.add_argument('--corpus_file', type=str, default='')
+parser.add_argument('--target_epoch', type=int, default=0)
+parser.add_argument('--checkpoint_version_name', type=str, default='')
+parser.add_argument('--checkpoint_epoch', type=int, default=0)
+parser.add_argument('--checkpoint_type', type=str, default='')
+parser.add_argument('--corpus_test_split', type=float, default=0)
+
+cli_args = parser.parse_args()
+
 # script args
 args = {
-    'corpus_file': 'zhihu_small.txt',
-    'target_epoch': 50,
-    'checkpoint_version_name': 'small',
-    'checkpoint_epoch': 45,
-    'checkpoint_type': 'trainable',
+    'corpus_file': cli_args.corpus_file or 'zhihu_small.txt',
+    'target_epoch': cli_args.target_epoch or 50,
+    'checkpoint_version_name': cli_args.checkpoint_version_name or 'small',
+    'checkpoint_epoch': cli_args.checkpoint_epoch or 45,
+    'checkpoint_type': cli_args.checkpoint_type or 'trainable',
     'plt': False,
-    'corpus_test_split': 0.985,
+    'corpus_test_split': cli_args.corpus_test_split or 0.985,
 }
 
 
@@ -23,6 +35,9 @@ log_title('#' * 6 + ' RUN mta-lstm-multi-layer.py ' + '#' * 6)
 print('\n\n', flush=True)
 print(args, flush=True)
 
+
+# debug cli
+# exit()
 
 # # MTA-LSTM-PyTorch
 # 

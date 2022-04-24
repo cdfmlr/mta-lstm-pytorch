@@ -4,4 +4,7 @@
 *.out
 .ipynb_checkpoints
 data/*.txt
-model_result_multi_layer/
+model_result_multi_layer/*.pt
+model_result_multi_layer/*.pkl
+model_result_multi_layer/*.py
+*.tar.gz

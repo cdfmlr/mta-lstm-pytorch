@@ -12,6 +12,7 @@ parser.add_argument('--checkpoint_type', type=str, default='')
 parser.add_argument('--corpus_test_split', type=float, default=0)
 parser.add_argument('--data_dir', type=str, default='data/')
 parser.add_argument('--model_dir', type=str, default='model_result_multi_layer/')
+parser.add_argument('--batch_size', type=int, default=32)
 
 
 cli_args = parser.parse_args()
@@ -26,7 +27,8 @@ args = {
     'plt': False,
     'corpus_test_split': cli_args.corpus_test_split or 0.985,
     'data_dir': cli_args.data_dir or 'data/',
-    'model_dir': cli_args.model_dir or 'model_result_multi_layer/'
+    'model_dir': cli_args.model_dir or 'model_result_multi_layer/',
+    'batch_size': cli_args.batch_size or 32,
 }
 
 
@@ -778,7 +780,7 @@ clip_value = 0.1
 use_gpu = True     # can not be False
 num_layers = 2
 bidirectional = False
-batch_size = 32
+batch_size = args['batch_size']
 num_keywords = 5
 verbose = 1
 check_point = 5

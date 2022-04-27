@@ -125,7 +125,7 @@ log_title('use cuda or cpu as device')
 os.environ["CUDA_VISIBLE_DEVICES"]="0,1"
 print('Available cuda:', torch.cuda.device_count(), flush=True)
 if torch.cuda.is_available():
-    device_num = 1
+    device_num = 0
     deviceName = "cuda:%d" % device_num
     torch.cuda.set_device(device_num)
     print('Current device:', torch.cuda.current_device(), flush=True)

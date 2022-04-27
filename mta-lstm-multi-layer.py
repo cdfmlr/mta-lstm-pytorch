@@ -205,7 +205,7 @@ file_path = args['data_dir']
 file_name = args['corpus_file']
 
 num_lines = sum(1 for line in open(os.path.join(file_path, file_name), 'r'))
-with open(file_path+file_name) as f:
+with open(os.path.join(file_path, file_name)) as f:
     for line in tqdm(f, total=num_lines):
         essay, topic = line.replace('\n', '').split(' </d> ')
         essays.append(essay.split(' '))

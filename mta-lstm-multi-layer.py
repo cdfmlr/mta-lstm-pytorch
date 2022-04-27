@@ -318,6 +318,35 @@ def data_iterator(corpus_indice, topics_indice, batch_size, num_steps):
         yield(x, y, mask, key_words)
 
 
+from queue import Queue
+import threading
+        
+class BufferedDataIterator:
+    def __init__(self, corpus_indice, topics_indice, batch_size, num_steps, buffer_size=32):
+        self.generator = data_iterator(corpus_indice, topics_indice, batch_size, num_steps)
+        self.thread = threading.Thread(target=self._generator_call)
+        self.q = Queue(maxsize=buffer_size)
+        
+        self.thread.start()
+        
+    def __iter__(self):
+        return self
+
+    def __next__(self):
+        done, item = self.q.get()
+        if done:
+            raise StopIteration
+        else:
+            return item
+
+    def _generator_call(self):
+        try:
+            for output in self.generator:
+                self.q.put((False, output))
+        finally:
+            self.q.put((True, None))
+
+
 # ## Build model: MTA-LSTM
 # 
 # This is the most important part in the notebook.
@@ -1187,7 +1216,8 @@ for epoch in range(num_epoch - prev_epoch):
     num, total_loss = 0, 0
 #     optimizer = decay_lr(optimizer=optimizer, epoch=epoch+1)
     topics_indice, corpus_indice = shuffleData(topics_indice, corpus_indice) # shuffle data at every epoch
-    data = data_iterator(corpus_indice, topics_indice, batch_size, max(length) + 1)
+    # data = data_iterator(corpus_indice, topics_indice, batch_size, max(length) + 1)
+    data = BufferedDataIterator(corpus_indice, topics_indice, batch_size, max(length) + 1)
     hidden = model.init_hidden(batch_size=batch_size)
     weight = torch.ones(len(vocab))
     weight[0] = 0

@@ -10,6 +10,9 @@ parser.add_argument('--checkpoint_version_name', type=str, default='')
 parser.add_argument('--checkpoint_epoch', type=int, default=0)
 parser.add_argument('--checkpoint_type', type=str, default='')
 parser.add_argument('--corpus_test_split', type=float, default=0)
+parser.add_argument('--data_dir', type=str, default='data/')
+parser.add_argument('--model_dir', type=str, default='model_result_multi_layer/')
+
 
 cli_args = parser.parse_args()
 
@@ -22,6 +25,8 @@ args = {
     'checkpoint_type': cli_args.checkpoint_type or 'trainable',
     'plt': False,
     'corpus_test_split': cli_args.corpus_test_split or 0.985,
+    'data_dir': cli_args.data_dir or 'data/',
+    'model_dir': cli_args.model_dir or 'model_result_multi_layer/'
 }
 
 
@@ -142,18 +147,18 @@ device = torch.device(deviceName)
 log_title('pretrained embedding')
 
 
-save_folder = 'model_result_multi_layer'
+save_folder = args['model_dir']
 
-vocab_check_point = '%s/vocab.pkl' % save_folder
-word_vec_check_point = '%s/word_vec.pkl' % save_folder
+vocab_check_point = os.path.join(save_folder, 'vocab.pkl')
+word_vec_check_point = os.path.join(save_folder, 'word_vec.pkl')
 
 if os.path.exists(vocab_check_point) and os.path.exists(word_vec_check_point):
     vocab = torch.load(vocab_check_point)
     word_vec = torch.load(word_vec_check_point)
 else:
-    file_path = 'data/'
+    file_path = args['data_dir']
     
-    fvec = KeyedVectors.load_word2vec_format(file_path+'composition_mincount_1_305000_vec_original.txt', binary=False)
+    fvec = KeyedVectors.load_word2vec_format(os.path.join(file_path, 'composition_mincount_1_305000_vec_original.txt'), binary=False)
     
     word_vec = fvec.vectors
     
@@ -196,10 +201,10 @@ log_title('Load preprocessed data')
 essays = []
 topics = []
 
-file_path = 'data/'
-file_name = args['corpus_file']  ### TODO
+file_path = args['data_dir']
+file_name = args['corpus_file']
 
-num_lines = sum(1 for line in open(file_path+file_name, 'r'))
+num_lines = sum(1 for line in open(os.path.join(file_path, file_name), 'r'))
 with open(file_path+file_name) as f:
     for line in tqdm(f, total=num_lines):
         essay, topic = line.replace('\n', '').split(' </d> ')
@@ -1076,7 +1081,9 @@ Type = args['checkpoint_type']                      ### TODO
 # Type = 'best'
 
 def check_point_path(obj_name, save_folder, Type, version_name, epoch_num):
-    return f'{save_folder}/{version_name}_{epoch_num}_{Type}_{obj_name}.pt'
+    # f'{save_folder}/{version_name}_{epoch_num}_{Type}_{obj_name}.pt'
+    return os.path.join(save_folder, f'{version_name}_{epoch_num}_{Type}_{obj_name}.pt')
+
 
 # model_check_point = '%s/model_%s_%d.pk' % (save_folder, Type, version_num)
 # optim_check_point = '%s/optim_%s_%d.pkl' % (save_folder, Type, version_num)

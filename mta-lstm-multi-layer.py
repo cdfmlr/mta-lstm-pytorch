@@ -1229,12 +1229,12 @@ for epoch in range(num_epoch - prev_epoch):
         optimizer.step()
         total_loss += float(loss.item())
         
-        if np.isnan(total_loss):
-            for name, p in model.named_parameters():
-                if p.grad is None:
-                    continue 
-                print(name, p, flush=True)
-            assert False, "Gradient explode"
+#         if np.isnan(total_loss):
+#             for name, p in model.named_parameters():
+#                 if p.grad is None:
+#                     continue 
+#                 print(name, p, flush=True)
+#             assert False, "Gradient explode"
     
     one_iter_loss = np.mean(total_loss)
     lr_scheduler.step(one_iter_loss)

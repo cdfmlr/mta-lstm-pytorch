@@ -1105,11 +1105,18 @@ if os.path.isfile(model_check_point):
     print(f'Loading previous status (ver.{version_name}_{version_epoch_num})...', flush=True)
     model.load_state_dict(torch.load(model_check_point, map_location='cpu'))
     model = model.to(device)
-    optimizer.load_state_dict(torch.load(optim_check_point))
+    if torch.cuda.is_available():
+        optimizer.load_state_dict(torch.load(optim_check_point))
+        loss_values = torch.load(loss_check_point)
+        epoch_values = torch.load(epoch_check_point)
+        bleu_values = torch.load(bleu_check_point)
+    else:
+        optimizer.load_state_dict(torch.load(optim_check_point, map_location='cpu'))
+        loss_values = torch.load(loss_check_point, map_location='cpu')
+        epoch_values = torch.load(epoch_check_point, map_location='cpu')
+        bleu_values = torch.load(bleu_check_point, map_location='cpu')
     lr_scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=0.4, patience=2, min_lr=1e-7, verbose=True)
-    loss_values = torch.load(loss_check_point)
-    epoch_values = torch.load(epoch_check_point)
-    bleu_values = torch.load(bleu_check_point)
+
     print('Load successfully', flush=True)
 else:
     print(f"ver.{version_name}_{version_epoch_num} doesn't exist", flush=True)

@@ -1,5 +1,6 @@
 *.model
 *.pt
+*.pkl
 *.npy
 *.out
 .ipynb_checkpoints

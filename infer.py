@@ -18,7 +18,19 @@ parser.add_argument('--http', action='store_true', help='run HTTP service')
 parser.add_argument("--host", type=str, help="server host", default="localhost")
 parser.add_argument("--port", type=int, help="listen port", default=8080)
 
+parser.add_argument("--baidu_translate", type=str, help='use baidu translate: --baidu_translate="appid:appkey:qps"')
+
 cli_args = parser.parse_args()
+
+if ':' in cli_args.baidu_translate:
+    sp = cli_args.baidu_translate.split(':')
+    baidu_translate = {
+        'appid': sp[0],
+        'appkey': sp[1],
+        'qps': int(sp[2]) if len(sp) > 2 else 1
+    }
+else:
+    baidu_translate = {}
 
 # script args
 args = {
@@ -32,6 +44,8 @@ args = {
     'http': cli_args.http,
     'host': cli_args.host,
     'port': cli_args.port,
+
+    'baidu_translate': baidu_translate,
 }
 
 
@@ -61,6 +75,8 @@ def log_title(s: str):
 
 log_title("start...")
 
+# region import
+
 log_title('import packages...')
 
 # ## Import packages
@@ -68,10 +84,13 @@ log_title('import packages...')
 # The followings are some packages that'll be used in this work. Make sure you have them installed.
 
 import os
+import abc
 import time
+import json
 import random
 from collections import namedtuple
 from typing import List
+from hashlib import md5
 
 from gensim.models import KeyedVectors
 import numpy as np
@@ -82,6 +101,9 @@ import jieba
 import jieba.analyse
 from aiohttp import web
 from aiohttp.web_exceptions import HTTPException
+import requests
+
+# endregion import
 
 # region cuda-device
 
@@ -595,11 +617,11 @@ else:
 
 def infer(input_keywords, method='beam_search', is_sample=False, verbose=False):
     """infer() generates a sentence from input_keywords
-    
-    example: 
+
+    example:
         infer(['现在', '未来', '梦想', '科学', '文化'], method='beam_search', is_sample=True)
-    
-    :param input_keywords: 
+
+    :param input_keywords:
     :param method: "beam_search" or "predict_rnn" (greedy decode strategy)
     :param is_sample: do sample in beam_search
     :param verbose: prints input & output
@@ -629,27 +651,125 @@ def infer(input_keywords, method='beam_search', is_sample=False, verbose=False):
 # infer(['体会', '母亲', '滴水之恩', '母爱', '养育之恩'], method='beam_search', is_sample=True, verbose=True)
 
 
+# endregion infer
+
+# region translate
+
+class Translator(abc.ABC):
+    @abc.abstractmethod
+    def translate(self, text, *args, **kwargs) -> str:
+        raise NotImplemented
+
+
+class NoTranslator(Translator):
+    """NoTranslator 不做翻译，translate 返回原字符串
+
+    """
+
+    def translate(self, text, *args, **kwargs) -> str:
+        return text
+
+
+class BaiduTranslator(Translator):
+    """百度翻译 API
+    https://fanyi-api.baidu.com
+    """
+
+    def __init__(self, app_id, app_key, qps=1):
+        self.app_id = app_id
+        self.app_key = app_key
+        self.qps = qps
+
+    def translate(self, text, from_lang='auto', to_lang='zh', verbose=False) -> str:
+        """翻译文本
+
+        :param text: 待翻译文本
+        :param from_lang: 源语言
+        :param to_lang: 目标语言
+        :return: str 翻译结果
+        """
+
+        endpoint = 'http://api.fanyi.baidu.com'
+        path = '/api/trans/vip/translate'
+        url = endpoint + path
+
+        query = text
+
+        salt = random.randint(32768, 65536)
+        sign = self.make_md5(self.app_id + query + str(salt) + self.app_key)
+
+        # Build request
+        headers = {'Content-Type': 'application/x-www-form-urlencoded'}
+        payload = {
+            'appid': self.app_id, 'q': query,
+            'from': from_lang, 'to': to_lang,
+            'salt': salt, 'sign': sign,
+        }
+
+        # Send request
+        r = requests.post(url, params=payload, headers=headers)
+
+        result = r.json()
+
+        # Show response
+        if verbose:
+            print(f'translate "{text}" => ' + json.dumps(result, ensure_ascii=False))
+        # if r.status_code != 200:
+        #     print(f'translate failed ({r.status_code}): {result}')
+        #     return text
+
+        time.sleep(1 / self.qps)
+        try:
+            return result['trans_result'][0]['dst']
+        except KeyError or IndexError:
+            print(f'translate failed ({r.status_code}): "{text}" => {result}')
+            return text
+
+    def make_md5(self, s, encoding='utf-8'):
+        """Generate salt and sign
+        """
+        return md5(s.encode(encoding)).hexdigest()
+
+
+# endregion translate
+
+# region TextGenerator
+
 class TextGenerator:
     """['句子', ...] => ['关键词', ...] => '生成文本'
     """
+
+    def __init__(self, translator: Translator = NoTranslator()):
+        self._translator = translator
 
     def _gen_keywords(self, input_sentences: List[str], verbose=False) -> List[str]:
         """['句子', ...] => ['关键词', ...]
 
         关键词不够 num_keywords（5个）或有的词不在 vocab 中，则随机选择词语来凑。
         """
+
+        translated_sentences = list(map(self._translate, input_sentences))
         if verbose:
-            print(f'input_sentences = {input_sentences}')
-        temp_text = ' '.join(input_sentences)
-        keywords = jieba.analyse.extract_tags(temp_text, withWeight=False, topK=num_keywords)
+            print(f'{input_sentences=}\n{translated_sentences=}')
+
+        temp_text = ' '.join(translated_sentences)
+
+        keywords = jieba.analyse.extract_tags(temp_text, withWeight=False)
         # print(f'DEBUG keywords = {keywords}')
         keywords = list(filter(lambda w: w in vocab, keywords))
         # print(f'DEBUG keywords_in_vocab = {keywords}')
+
         while len(keywords) < num_keywords:
             keywords.append(vocab[random.randint(4, len(vocab))])
+
         if verbose:
             print(f'keywords = {keywords}')
         return keywords[:num_keywords]
+
+    def _translate(self, text):
+        if is_chinese(text):
+            return text
+        return self._translator.translate(text, verbose=verbose)
 
     def _gen_text(self, input_keywords: List[str], verbose=False) -> str:
         """['关键词', ...] => '文本'
@@ -671,6 +791,20 @@ class TextGenerator:
         return self.generate(input_sentences)
 
 
+def is_chinese(text: str) -> bool:
+    """判断文本是为中文，有任一中文字符就认为是中文。
+
+    特殊情况: 若 text 为空，返回 True
+    """
+    text = text.strip()
+    if not text:
+        return True
+    for c in text:
+        if '\u4e00' <= c <= '\u9fa5':
+            return True
+    return False
+
+
 # g = TextGenerator()
 #
 # print(g([]))
@@ -682,7 +816,7 @@ class TextGenerator:
 # print(g(['妈妈', '希望', '长大', '孩子', '母爱']))
 
 
-# endregion infer
+# endregion TextGenerator
 
 # region server
 
@@ -778,10 +912,10 @@ class TextGenServer(CorsServer):
     """主题文本生成的服务
     """
 
-    def __init__(self, log=True, verbose=False):
+    def __init__(self, translator: Translator = NoTranslator(), log=True, verbose=False):
         super().__init__(log=log)
         self.verbose = verbose
-        self.generator = TextGenerator()
+        self.generator = TextGenerator(translator=translator)
         self.add_route('GET', '/gen', self.handle_text_gen)
 
     async def handle_text_gen(self, request: web.Request):
@@ -794,7 +928,14 @@ class TextGenServer(CorsServer):
 
 
 if __name__ == '__main__' and args['http']:
-    server = TextGenServer(verbose=True)
+    if args['baidu_translate']:
+        translator = BaiduTranslator(
+            args['baidu_translate']['appid'],
+            args['baidu_translate']['appkey'],
+            qps=baidu_translate.get('qps', 1))
+    else:
+        translator = NoTranslator()
+    server = TextGenServer(translator=translator, verbose=True)
     server.run(host=args['host'], port=args['port'])
 
 # endregion server

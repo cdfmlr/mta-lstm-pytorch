@@ -745,6 +745,8 @@ class TextGenerator:
     def _gen_keywords(self, input_sentences: List[str], verbose=False) -> List[str]:
         """['句子', ...] => ['关键词', ...]
 
+        第一个句子（input_sentences[0]）最重要，优先使用其中的词语。
+        第一句不够时，再用其他句子（合并为一句处理）中的词补充。
         关键词不够 num_keywords（5个）或有的词不在 vocab 中，则随机选择词语来凑。
         """
 
@@ -752,13 +754,23 @@ class TextGenerator:
         if verbose:
             print(f'{input_sentences=}\n{translated_sentences=}')
 
-        temp_text = ' '.join(translated_sentences)
+        # 优先用第一句的关键词
+        if translated_sentences:
+            keywords = jieba.analyse.extract_tags(translated_sentences[0], withWeight=False)
+        else:
+            keywords = []
+        # print(f'DEBUG keywords_first_sentence = {keywords}')
 
-        keywords = jieba.analyse.extract_tags(temp_text, withWeight=False)
-        # print(f'DEBUG keywords = {keywords}')
+        # 其他句子：合成一大句
+        temp_text = ' '.join(translated_sentences[1:])
+        keywords.extend(jieba.analyse.extract_tags(temp_text, withWeight=False))
+        # print(f'DEBUG keywords_all_sentences = {keywords}')
+
+        # 过滤留下在模型词表中的词
         keywords = list(filter(lambda w: w in vocab, keywords))
         # print(f'DEBUG keywords_in_vocab = {keywords}')
 
+        # 随机补充，凑够 5 个
         while len(keywords) < num_keywords:
             keywords.append(vocab[random.randint(4, len(vocab))])
 
@@ -919,11 +931,14 @@ class TextGenServer(CorsServer):
         self.add_route('GET', '/gen', self.handle_text_gen)
 
     async def handle_text_gen(self, request: web.Request):
-        seed = request.query.get('s')
-        if not seed:
+        """ GET /gen?s=SENTENCES1&s=SENTENCES2&...
+
+        第一个句子 SENTENCES1 最重要。
+        """
+        seeds = request.query.getall('s')
+        if not seeds:
             raise web.HTTPBadRequest(text='require query string s=SEED+SENTENCES+HERE')
-        seed = seed.split(' ')
-        text = self.generator.generate(seed, verbose=self.verbose)
+        text = self.generator.generate(seeds, verbose=self.verbose)
         return web.Response(text=text)
 
 
